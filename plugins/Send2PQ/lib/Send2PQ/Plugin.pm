@@ -242,6 +242,10 @@ sub send_all_to_queue {
     # Prevent building of disabled templates if they get this far
     return 0 if $throttle->{type} == MT::PublishOption::DISABLED();
 
+    # Signal that Send2PQ was responsible for doing all of the work for this
+    # job.
+    $fi->{from_queue} = 1;
+
     # Check for 'force' flag for 'manual' publish option, which
     # forces the template to build; used for 'rebuild' list actions
     # and publish site operations
@@ -269,28 +273,50 @@ sub send_all_to_queue {
         uniqkey => $fi->id,
         funcid  => $func_id,
     });
+
     if ($job) { return 0; }
-    $job = MT->model('ts_job')->new;
-    $job->uniqkey( $fi->id );
-    $job->funcid( $func_id );
-    if ($job->has_column('batch_id')) {
-        $job->batch_id( $batch->id );
-    }
+
+    # Using `MT->model('ts_job')` seems to be somewhat unreliable in that
+    # sometimes it doesn't save a job correctly. Switching to
+    # `TheSchwartz::Job` seems to fix that, and it's what is used in
+    # `MT::WeblogPublisher::queue_build_file_filter`. Unfortunately, for some
+    # reason this doesn't recognize the `batch_id` column that Send2PQ adds to
+    # the ts_job table... deal with that below.
+    # my $job = MT->model('ts_job')->new();
+    my $job = TheSchwartz::Job->new();
+    $job->uniqkey(  $fi->id               );
+    $job->funcname( 'MT::Worker::Publish' );
+
     $job->priority( $priority );
     $job->grabbed_until(1);
     $job->run_after(1);
-    $job->coalesce( ( $fi->blog_id || 0 ) . ':' . $$ . ':' .
-                    $priority . ':' . ( time - ( time % 10 ) ) );
 
-    # Note to self - this does not appear to utilize TheSchwart's insert
-    # routine. Should this be fixed?
-    # $job->save or MT->log({
-    # Using the insert routine seems to work... and fixes an error on a
-    # client's site.
-    $job->insert or MT->log({
+    my $coalesce = ( $fi->blog_id || 0 ) . ':' 
+        . $$ . ':'
+        . $priority . ':'
+        . ( time - ( time % 10 ) );
+
+    $job->coalesce( $coalesce );
+
+    MT::TheSchwartz->insert($job) or MT->log({
         blog_id => $fi->blog_id,
-        message => "Could not queue publish job for Send2Q: " . $job->errstr
+        message => "Could not queue publish job for Send2PQ: " . $job->errstr
     });
+
+    # Now that the job has been created through `MT::Schwartz` (rather than
+    # `MT->model('ts_job')`) we can update the `batch_id` column. As noted
+    # above, for some reason the new column isn't available to `MT::Schwartz`,
+    # so we need to do a lookup to find and set it now.
+    my $job_update = MT->model('ts_job')->load({
+        uniqkey  => $fi->id,
+        funcid   => $func_id,
+        coalesce => $coalesce,
+    });
+
+    if ($job_update) {
+        $job_update->batch_id( $batch->id );
+        $job_update->save or die $job_update->errstr;
+    }
 
     return 0;
 }

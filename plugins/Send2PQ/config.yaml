@@ -16,7 +16,9 @@ applications:
       send_blogs_to_queue: $Send2PQ::Send2PQ::Plugin::send_blogs_to_queue
 
 callbacks:
-  build_file_filter: $Send2PQ::Send2PQ::Plugin::send_all_to_queue
+  build_file_filter:
+      handler: $Send2PQ::Send2PQ::Plugin::send_all_to_queue
+      priority: 1
   build_file: $Send2PQ::Send2PQ::Plugin::build_file
 
 page_actions:
