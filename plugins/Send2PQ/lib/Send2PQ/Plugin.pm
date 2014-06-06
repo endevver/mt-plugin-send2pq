@@ -283,7 +283,7 @@ sub send_all_to_queue {
     # reason this doesn't recognize the `batch_id` column that Send2PQ adds to
     # the ts_job table... deal with that below.
     # my $job = MT->model('ts_job')->new();
-    my $job = TheSchwartz::Job->new();
+    $job = TheSchwartz::Job->new();
     $job->uniqkey(  $fi->id               );
     $job->funcname( 'MT::Worker::Publish' );
 
