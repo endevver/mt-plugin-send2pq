@@ -98,14 +98,14 @@ sub send_blogs_to_queue {
         }
 
         # Redirect back to the blog listing screen.
-        if ( $app->product_version =~ /^5/ ) {
+        if ( $app->product_version =~ /^4/ ) {
+            return $app->load_tmpl( 'dialog/close.tmpl' );
+        }
+        else {
             return $app->redirect(
                 $app->{cfg}->CGIPath . $app->{cfg}->AdminScript
                 . "?__mode=list&_type=blog&blog_id=0"
             );
-        }
-        else {
-            return $app->load_tmpl( 'dialog/close.tmpl' );
         }
     }
 
@@ -126,14 +126,14 @@ sub send_to_queue {
         _create_batch( $app->blog->id, $q->param('email') );
 
         # Redirect back to the template listing screen.
-        if ( $app->product_version =~ /^5/ ) {
+        if ( $app->product_version =~ /^4/ ) {
+            return $app->load_tmpl( 'dialog/close.tmpl' );
+        }
+        else {
             return $app->redirect(
                 $app->{cfg}->CGIPath . $app->{cfg}->AdminScript
                 . "?__mode=list_template&blog_id=" . $app->blog->id
             );
-        }
-        else {
-            return $app->load_tmpl( 'dialog/close.tmpl' );
         }
     }
 
